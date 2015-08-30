@@ -126,7 +126,6 @@ multiCache.wrap(key2, function (cb) {
         console.log(user);
     });
 });
-```
 
 function getUser(id, cb) {
     setTimeout(function () {
@@ -134,6 +133,9 @@ function getUser(id, cb) {
         cb(null, {id: id, name: 'Bob'});
     }, 100);
 }
+```
+
+
 
 Contribution
 ------------
