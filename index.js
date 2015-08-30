@@ -27,9 +27,13 @@ module.exports = {
  */
 
 function MongoStore(args) {
-
+  
   var conn = args;
   var options;
+  if (args.uri)
+    conn = args.uri;
+  if (args.options)
+    options = args.options;
 
   if (!(this instanceof MongoStore))
     return new MongoStore(args);
@@ -42,7 +46,7 @@ function MongoStore(args) {
 
   if ('object' === typeof conn) {
     if ('function' !== typeof conn.collection) {
-      options = conn;
+      options = conn.options;
       if (Object.keys(options).length === 0) {
         conn = null;
       } else if (options.client) {
@@ -232,10 +236,10 @@ MongoStore.prototype.reset = function reset(key, fn) {
   });
 };
 
-MongoStore.prototype.isCacheableValue = function(value) {
-    return value !== null && value !== undefined;
-  };
-  
+MongoStore.prototype.isCacheableValue = function (value) {
+  return value !== null && value !== undefined;
+};
+
 /**
  * Non-exported Helpers
  */

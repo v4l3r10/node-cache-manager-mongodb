@@ -23,19 +23,26 @@ Here are examples that demonstrate how to implement the Redis cache store.
 var cacheManager = require('cache-manager');
 var mongoStore = require('cache-manager-mongo');
 
-var mongoCache = cacheManager.caching({
-	store: mongoStore,
-	uri: 'mongodb://localhost/testDb', // default value
-  "options" : {
-    "user" : "user",
-    "pass" : "pass",
-    "server" : {
-      "poolSize" : 5
-     }
-  }
-});
 
-var ttl = 5;
+var mongoCache = cacheManager.caching({
+    store : mongoStore,
+    uri : "mongodb://user:pass@localhost:27017/nodeCacheDb",
+    options : {
+      host : '127.0.0.1',
+      port : '27017',
+      username : "username",
+      password : "pass",
+      database : "nodeCacheDb",
+      collection : "cacheManager",
+      compression : false,
+      server : {
+        poolSize : 5,
+        auto_reconnect: true
+      }
+    }
+  });
+
+var ttl = 60;
 
 mongoCache.set('foo', 'bar', ttl, function(err) {
     if (err) {
@@ -80,7 +87,7 @@ mongoCache.wrap(key, function (cb) {
 var cacheManager = require('cache-manager');
 var mongoStore = require('cache-manager-mongo');
 
-var mongoCache = cacheManager.caching({store: mongoStore, db: 0, ttl: 600});
+var mongoCache = cacheManager.caching({store: mongoStore, uri: 'mongodb://user:pass@localhost:27017/nodeCacheDb',options: { collection: 'cacheManager'}, ttl: 600});
 var memoryCache = cacheManager.caching({store: 'memory', max: 100, ttl: 60});
 
 var multiCache = cacheManager.multiCaching([memoryCache, mongoCache]);
