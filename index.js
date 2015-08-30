@@ -1,170 +1,280 @@
 'use strict';
 
-var Mongodb = require('mongoose');
-var mongoose = require('mongoose');
+/**
+ * Module dependencies.
+ */
 
-function mongodbStore(args) {
+var Client = require('mongodb').MongoClient,
+uri = require('mongodb-uri'),
+thunky = require('thunky'),
+zlib = require('zlib'), noop = function () {};
+
+/**
+ * Export `MongoStore`.
+ */
+
+module.exports = {
+  create : function (args) {
+    return MongoStore(args);
+  }
+};
+
+/**
+ * MongoStore constructor.
+ *
+ * @param {Object} options
+ * @api public
+ */
+
+function MongoStore(args) {
+
+  var conn = args;
+  var options;
+
+  if (!(this instanceof MongoStore))
+    return new MongoStore(args);
+
   var self = {
     name : 'mongodb'
   };
 
-  //Schema define
-  var cacheSchema = mongoose.model(args.schema.name, {
-      cacheId : String,
-      data : {
-        args.schema.model
-      },
-      createdAt : {
-        type : Date,
-      default:
-        Date.now
+  var store = this;
+
+  if ('object' === typeof conn) {
+    if ('function' !== typeof conn.collection) {
+      options = conn;
+      if (Object.keys(options).length === 0) {
+        conn = null;
+      } else if (options.client) {
+        store.client = options.client
+      } else {
+        options.database = options.database || options.db;
+        options.hosts = options.hosts || [{
+              port : options.port || 27017,
+              host : options.host || '127.0.0.1'
+            }
+          ];
+        options.server = options.server;
+        conn = uri.format(options);
       }
-    });
-
-  var kitty = new Cat({
-      name : 'Zildjian'
-    });
-  kitty.save(function (err) {
-    if (err) // ...
-      console.log('meow');
-  });
-
-  var mongodbOptions = args || {};
-  var mongodbSettings = mongodbOptions;
-  var mongodbConnError = false;
-  mongodbOptions.uri = args.uri || 'mongodb://localhost/cache';
-
-  var pool = mongoose.createConnection(mongodbOptions.uri, mongodbOptions);
-
-  pool.on("error", function () {
-    mongodbConnError = true;
-  });
-
-  function connect(cb) {
-    if (mongodbConnError) {
-      return cb(new Error('MongoDb connection error'));
+    } else {
+      store.client = conn;
     }
-    if (!pool.readyState) {
-      pool.open(function (err) {
-        if (err) {
-          pool.disconnect();
-          return cb(err);
-        }
-
-        cb(null);
-      });
-    } else
-      return cb(null);
   }
-
-  function handleResponse(cb, opts) {
-    opts = opts || {};
-
-    return function (err, result) {
-      pool.disconnect();
-
-      if (err) {
-        return cb(err);
-      }
-
-      if (opts.parse) {
-        result = JSON.parse(result);
-      }
-
-      cb(null, result);
-    };
-  }
-
-  self.get = function (key, options, cb) {
-    if (typeof options === 'function') {
-      cb = options;
-    }
-    connect(function (err) {
-      if (err) {
-        return cb(err);
-      }
-      cacheSchema.findById(key, handleResponse(cb, {
-          parse : false
-        }));
-    });
-  };
-
-  self.set = function (key, value, options, cb) {
-    if (typeof options === 'function') {
-      cb = options;
-      options = {};
-    }
-    options = options || {};
-
-    var ttl = (options.ttl || options.ttl === 0) ? options.ttl : mongodbOptions
-    .ttl;
-
-    connect(function (err) {
-      if (err) {
-        return cb(err);
-      }
-      var val = value;
-      var model = new cacheSchema({
-          cacheId : key,
-          data : value
+  conn = conn || 'mongodb://127.0.0.1:27017';
+  options = options || {};
+  store.coll = options.collection || 'cacheman';
+  store.compression = options.compression || false;
+  store.ready = thunky(function ready(cb) {
+      if ('string' === typeof conn) {
+        console.log(conn);
+        console.log(options);
+        Client.connect(conn, options, function getDb(err, db) {
+          if (err)
+            return cb(err);
+          cb(null, store.client = db);
         });
-      if (ttl)
-        model.path('createdAt').expires(ttl);
-
-      model.save(handleResponse(cb));
-
-    });
-  };
-
-  self.del = function (key, options, cb) {
-    if (typeof options === 'function') {
-      cb = options;
-      options = {};
-    }
-
-    connect(function (err) {
-      if (err) {
-        return cb(err);
+      } else {
+        if (store.client)
+          return cb(null, store.client);
+        cb(new Error('Invalid mongo connection.'));
       }
-      cacheSchema.findByIdAndRemove(key, handleResponse(cb, {
-          parse : false
-        }));
     });
-  };
-/*
-  self.ttl = function (key, cb) {
-    connect(function (err, conn) {
-      if (err) {
-        return cb(err);
-      }
-      model.path('createdAt').expires('ttl');
-      conn.ttl(key, handleResponse(conn, cb));
-    });
-  };*/
-
-  self.keys = function (pattern, cb) {
-    if (typeof pattern === 'function') {
-      cb = pattern;
-      pattern = '*';
-    }
-
-    connect(function (err ) {
-      if (err) {
-        return cb(err);
-      }
-      cacheSchema.find(handleResponse( cb));
-    });
-  };
-
-  self.isCacheableValue = function (value) {
-    return value !== null && value !== undefined;
-  };
-
-  return self;
 }
 
-module.exports = {
-  create : function (args) {
-    return mongodbStore(args);
+/**
+ * Get an entry.
+ *
+ * @param {String} key
+ * @param {Function} fn
+ * @api public
+ */
+
+MongoStore.prototype.get = function get(key, options, fn) {
+  var store = this;
+  fn = fn || noop;
+  store.ready(function ready(err, db) {
+    if (err)
+      return fn(err);
+    db.collection(store.coll).findOne({
+      key : key
+    }, function findOne(err, data) {
+      if (err)
+        return fn(err);
+      if (!data)
+        return fn(null, null);
+      if (data.expire < Date.now()) {
+        store.del(key);
+        return fn(null, null);
+      }
+      try {
+        if (data.compressed)
+          return decompress(data.value, fn);
+        fn(null, data.value);
+      } catch (err) {
+        fn(err);
+      }
+    });
+  });
+};
+
+/**
+ * Set an entry.
+ *
+ * @param {String} key
+ * @param {Mixed} val
+ * @param {Number} ttl
+ * @param {Function} fn
+ * @api public
+ */
+
+MongoStore.prototype.set = function set(key, val, options, fn) {
+
+  if ('function' === typeof options) {
+    fn = options;
+    options = null;
   }
+
+  fn = fn || noop;
+  var ttl = options.ttl;
+  var data,
+  store = this,
+  query = {
+    key : key
+  },
+  options = {
+    upsert : true,
+    safe : true
+  };
+
+  try {
+    data = {
+      key : key,
+      value : val,
+      expire : Date.now() + ((ttl || 60) * 1000)
+    };
+  } catch (err) {
+    return fn(err);
+  }
+
+  store.ready(function ready(err, db) {
+    if (err)
+      return fn(err);
+    if (!store.compression) {
+      update(data);
+    } else {
+      compress(data, function compressData(err, data) {
+        if (err)
+          return fn(err);
+        update(data);
+      });
+    }
+    function update(data) {
+      db.collection(store.coll).update(query, data, options, function _update(err, data) {
+        if (err)
+          return fn(err);
+        if (!data)
+          return fn(null, null);
+        fn(null, val);
+      });
+    }
+  });
+};
+
+/**
+ * Delete an entry.
+ *
+ * @param {String} key
+ * @param {Function} fn
+ * @api public
+ */
+
+MongoStore.prototype.del = function del(key, options, fn) {
+  if (typeof options === 'function') {
+    fn = options;
+  }
+  var store = this;
+  fn = fn || noop;
+  this.ready(function ready(err, db) {
+    if (err)
+      return fn(err);
+    db.collection(store.coll).remove({
+      key : key
+    }, {
+      safe : true
+    }, fn);
+  });
+};
+
+/**
+ * Clear all entries for this bucket.
+ *
+ * @param {String} key
+ * @param {Function} fn
+ * @api public
+ */
+
+MongoStore.prototype.reset = function reset(key, fn) {
+  var store = this;
+
+  if ('function' === typeof key) {
+    fn = key;
+    key = null;
+  }
+
+  fn = fn || noop;
+  store.ready(function ready(err, db) {
+    if (err)
+      return fn(err);
+    db.collection(store.coll).remove({}, {
+      safe : true
+    }, fn);
+  });
+};
+
+MongoStore.prototype.isCacheableValue = function(value) {
+    return value !== null && value !== undefined;
+  };
+  
+/**
+ * Non-exported Helpers
+ */
+
+/**
+ * Compress data value.
+ *
+ * @param {Object} data
+ * @param {Function} fn
+ * @api public
+ */
+
+function compress(data, fn) {
+
+  // Data is not of a "compressable" type (currently only Buffer)
+  if (!Buffer.isBuffer(data.value))
+    return fn(null, data);
+
+  zlib.gzip(data.value, function (err, val) {
+    // If compression was successful, then use the compressed data.
+    // Otherwise, save the original data.
+    if (!err) {
+      data.value = val;
+      data.compressed = true;
+    }
+
+    fn(err, data);
+  });
+};
+
+/**
+ * Decompress data value.
+ *
+ * @param {Object} value
+ * @param {Function} fn
+ * @api public
+ */
+
+function decompress(value, fn) {
+  var v = (value.buffer && Buffer.isBuffer(value.buffer)) ? value.buffer : value;
+  zlib.gunzip(v, fn);
 };
