@@ -28,12 +28,8 @@ module.exports = {
 
 function MongoStore(args) {
   
-  var conn = args;
-  var options;
-  if (args.uri)
-    conn = args.uri;
-  if (args.options)
-    options = args.options;
+  var conn = (args.uri) ? args.uri : args ;
+  var options = (args.options) ? args.options : {};
 
   if (!(this instanceof MongoStore))
     return new MongoStore(args);

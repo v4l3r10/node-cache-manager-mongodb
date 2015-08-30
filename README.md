@@ -1,7 +1,7 @@
 Node Cache Manager store for MongoDB
 ==================================
 
-[![Codacy Badge](https://img.shields.io/codacy/5b2c2727618c4acb8d06db34c2f61c03.svg)](https://www.codacy.com/public/dialonce/node-cache-manager-redis) [![Dependency Status](https://david-dm.org/dial-once/node-cache-manager-redis.svg)](https://david-dm.org/dial-once/node-cache-manager-redis)
+[![Codacy Badge](https://api.codacy.com/project/badge/c865d138d52541f8845090ed3992357a)](https://www.codacy.com/app/valerio-cavagni/node-cache-manager-mongodb) [![Dependency Status](https://david-dm.org/v4l3r10/node-cache-manager-mongodb.svg)](https://david-dm.org/v4l3r10/node-cache-manager-mongodb)
 
 The MongoDb store for the [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager) module.
 
@@ -15,13 +15,13 @@ npm install cache-manager-mongodb --save
 Usage examples
 --------------
 
-Here are examples that demonstrate how to implement the Redis cache store.
+Here are examples that demonstrate how to implement the Mongodb cache store.
 
 ### Single store
 
 ```js
 var cacheManager = require('cache-manager');
-var mongoStore = require('cache-manager-mongo');
+var mongoStore = require('cache-manager-mongodb');
 
 
 var mongoCache = cacheManager.caching({
@@ -85,7 +85,7 @@ mongoCache.wrap(key, function (cb) {
 
 ```js
 var cacheManager = require('cache-manager');
-var mongoStore = require('cache-manager-mongo');
+var mongoStore = require('cache-manager-mongodb');
 
 var mongoCache = cacheManager.caching({store: mongoStore, uri: 'mongodb://user:pass@localhost:27017/nodeCacheDb',options: { collection: 'cacheManager'}, ttl: 600});
 var memoryCache = cacheManager.caching({store: 'memory', max: 100, ttl: 60});
@@ -128,6 +128,13 @@ multiCache.wrap(key2, function (cb) {
 });
 ```
 
+function getUser(id, cb) {
+    setTimeout(function () {
+        console.log("Returning user from slow database.");
+        cb(null, {id: id, name: 'Bob'});
+    }, 100);
+}
+
 Contribution
 ------------
 
@@ -136,4 +143,4 @@ If you would like to contribute to the project, please fork it and send us a pul
 License
 -------
 
-`node-cache-manager-redis` is licensed under the MIT license.
+`node-cache-manager-mongodb` is licensed under the MIT license.
