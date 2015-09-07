@@ -13,7 +13,7 @@ zlib = require('zlib'), noop = function () {};
  * Export `MongoStore`.
  */
 
-module.exports = {
+exports = module.exports = {
   create : function (args) {
     return MongoStore(args);
   }
@@ -28,46 +28,42 @@ module.exports = {
 
 function MongoStore(args) {
 
-  var conn = (args.uri) ? args.uri : args;
-  var options = (args.options) ? args.options : {};
-
   if (!(this instanceof MongoStore))
     return new MongoStore(args);
 
-  var self = {
-    name : 'mongodb'
-  };
-
   var store = this;
+  var conn = (args.uri) ? args.uri : args;
+  var options = (args.options) ? args.options : {};
+  store.MongoOptions = options;
+  store.name = 'mongodb';
 
   if ('object' === typeof conn) {
     if ('function' !== typeof conn.collection) {
-      options = conn.options;
-      if (Object.keys(options).length === 0) {
+      MongoOptions = conn.options;
+      if (Object.keys(MongoOptions).length === 0) {
         conn = null;
-      } else if (options.client) {
-        store.client = options.client
+      } else if (MongoOptions.client) {
+        store.client = MongoOptions.client
       } else {
-        options.database = options.database || options.db;
-        options.hosts = options.hosts || [{
-              port : options.port || 27017,
-              host : options.host || '127.0.0.1'
+        store.MongoOptions.database = store.MongoOptions.database || store.MongoOptions.db;
+        store.MongoOptions.hosts = store.MongoOptions.hosts || [{
+              port : store.MongoOptions.port || 27017,
+              host : store.MongoOptions.host || '127.0.0.1'
             }
           ];
-        options.server = options.server;
-        conn = uri.format(options);
+        store.MongoOptions.hosts = store.MongoOptions.hosts || 3600;
+        conn = uri.format(store.MongoOptions);
       }
     } else {
       store.client = conn;
     }
   }
   conn = conn || 'mongodb://127.0.0.1:27017';
-  options = options || {};
-  store.coll = options.collection || 'cacheman';
-  store.compression = options.compression || false;
+  store.coll = store.MongoOptions.collection || 'cacheman';
+  store.compression = store.MongoOptions.compression || false;
   store.ready = thunky(function ready(cb) {
       if ('string' === typeof conn) {
-        Client.connect(conn, options, function getDb(err, db) {
+        Client.connect(conn, store.MongoOptions, function getDb(err, db) {
           if (err)
             return cb(err);
           cb(null, store.client = db);
@@ -78,6 +74,7 @@ function MongoStore(args) {
         cb(new Error('Invalid mongo connection.'));
       }
     });
+
 }
 
 /**
@@ -89,15 +86,15 @@ function MongoStore(args) {
  */
 
 MongoStore.prototype.get = function get(key, options, fn) {
-  
+
   if ('function' === typeof options) {
     fn = options;
     options = null;
   }
   fn = fn || noop;
-  
+
   var store = this;
-  
+
   store.ready(function ready(err, db) {
     if (err)
       return fn(err);
@@ -139,11 +136,12 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
     fn = options;
     options = null;
   }
-
   fn = fn || noop;
-  var ttl = options.ttl;
+
+  var store = this;
+  var ttl = (options && (options.ttl || options.ttl === 0)) ? options.ttl : store.MongoOptions.ttl;
+
   var data,
-  store = this,
   query = {
     key : key
   },
@@ -174,8 +172,10 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
         update(data);
       });
     }
+
     function update(data) {
       db.collection(store.coll).update(query, data, options, function _update(err, data) {
+
         if (err)
           return fn(err);
         if (!data)
@@ -183,6 +183,7 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
         fn(null, val);
       });
     }
+
   });
 };
 
