@@ -91,8 +91,6 @@ MongoStore.prototype.get = function get(key, options, fn) {
   store.client.collection(store.coll).findOne({
     key : key
   }, function findOne(err, data) {
-    console.log(err);
-    console.log(data);
     if (err)
       return fn(err);
     if (!data)
