@@ -65,6 +65,9 @@ function MongoStore(args) {
   if ('string' === typeof conn) {
     Client.connect(conn, store.MongoOptions, function getDb(err, db) {
       store.client = db;
+      db.createCollection(store.coll, function (err, collection) {
+        store.collection = collection;
+      });
     });
   }
 
@@ -88,7 +91,7 @@ MongoStore.prototype.get = function get(key, options, fn) {
 
   var store = this;
 
-  store.client.collection(store.coll).findOne({
+  store.collection.findOne({
     key : key
   }, function findOne(err, data) {
     if (err)
@@ -160,7 +163,7 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
   }
 
   function update(data) {
-    store.client.collection(store.coll).update(query, data, options, function _update(err, data) {
+    store.collection.update(query, data, options, function _update(err, data) {
 
       if (err)
         return fn(err);
@@ -185,15 +188,11 @@ MongoStore.prototype.del = function del(key, options, fn) {
   }
   var store = this;
   fn = fn || noop;
-  this.ready(function ready(err, db) {
-    if (err)
-      return fn(err);
-    db.collection(store.coll).remove({
-      key : key
-    }, {
-      safe : true
-    }, fn);
-  });
+  store.collection(store.coll).remove({
+    key : key
+  }, {
+    safe : true
+  }, fn);
 };
 
 /**
@@ -213,13 +212,11 @@ MongoStore.prototype.reset = function reset(key, fn) {
   }
 
   fn = fn || noop;
-  store.ready(function ready(err, db) {
-    if (err)
-      return fn(err);
-    db.collection(store.coll).remove({}, {
-      safe : true
-    }, fn);
-  });
+
+  store.collection.remove({}, {
+    safe : true
+  }, fn);
+
 };
 
 MongoStore.prototype.isCacheableValue = function (value) {
