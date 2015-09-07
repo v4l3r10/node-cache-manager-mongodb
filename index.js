@@ -27,8 +27,8 @@ module.exports = {
  */
 
 function MongoStore(args) {
-  
-  var conn = (args.uri) ? args.uri : args ;
+
+  var conn = (args.uri) ? args.uri : args;
   var options = (args.options) ? args.options : {};
 
   if (!(this instanceof MongoStore))
@@ -67,8 +67,6 @@ function MongoStore(args) {
   store.compression = options.compression || false;
   store.ready = thunky(function ready(cb) {
       if ('string' === typeof conn) {
-        console.log(conn);
-        console.log(options);
         Client.connect(conn, options, function getDb(err, db) {
           if (err)
             return cb(err);
@@ -91,8 +89,15 @@ function MongoStore(args) {
  */
 
 MongoStore.prototype.get = function get(key, options, fn) {
-  var store = this;
+  
+  if ('function' === typeof options) {
+    fn = options;
+    options = null;
+  }
   fn = fn || noop;
+  
+  var store = this;
+  
   store.ready(function ready(err, db) {
     if (err)
       return fn(err);
