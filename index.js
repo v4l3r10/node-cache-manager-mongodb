@@ -61,19 +61,12 @@ function MongoStore(args) {
   conn = conn || 'mongodb://127.0.0.1:27017';
   store.coll = store.MongoOptions.collection || 'cacheman';
   store.compression = store.MongoOptions.compression || false;
-  store.ready = thunky(function ready(cb) {
-      if ('string' === typeof conn) {
-        Client.connect(conn, store.MongoOptions, function getDb(err, db) {
-          if (err)
-            return cb(err);
-          cb(null, store.client = db);
-        });
-      } else {
-        if (store.client)
-          return cb(null, store.client);
-        cb(new Error('Invalid mongo connection.'));
-      }
+
+  if ('string' === typeof conn) {
+    Client.connect(conn, store.MongoOptions, function getDb(err, db) {
+      store.client = db;
     });
+  }
 
 }
 
@@ -95,28 +88,26 @@ MongoStore.prototype.get = function get(key, options, fn) {
 
   var store = this;
 
-  store.ready(function ready(err, db) {
+  store.client.collection(store.coll).findOne({
+    key : key
+  }, function findOne(err, data) {
+    console.log(err);
+    console.log(data);
     if (err)
       return fn(err);
-    db.collection(store.coll).findOne({
-      key : key
-    }, function findOne(err, data) {
-      if (err)
-        return fn(err);
-      if (!data)
-        return fn(null, null);
-      if (data.expire < Date.now()) {
-        store.del(key);
-        return fn(null, null);
-      }
-      try {
-        if (data.compressed)
-          return decompress(data.value, fn);
-        fn(null, data.value);
-      } catch (err) {
-        fn(err);
-      }
-    });
+    if (!data)
+      return fn(null, null);
+    if (data.expire < Date.now()) {
+      store.del(key);
+      return fn(null, null);
+    }
+    try {
+      if (data.compressed)
+        return decompress(data.value, fn);
+      fn(null, data.value);
+    } catch (err) {
+      fn(err);
+    }
   });
 };
 
@@ -160,31 +151,26 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
     return fn(err);
   }
 
-  store.ready(function ready(err, db) {
-    if (err)
-      return fn(err);
-    if (!store.compression) {
+  if (!store.compression) {
+    update(data);
+  } else {
+    compress(data, function compressData(err, data) {
+      if (err)
+        return fn(err);
       update(data);
-    } else {
-      compress(data, function compressData(err, data) {
-        if (err)
-          return fn(err);
-        update(data);
-      });
-    }
+    });
+  }
 
-    function update(data) {
-      db.collection(store.coll).update(query, data, options, function _update(err, data) {
+  function update(data) {
+    store.client.collection(store.coll).update(query, data, options, function _update(err, data) {
 
-        if (err)
-          return fn(err);
-        if (!data)
-          return fn(null, null);
-        fn(null, val);
-      });
-    }
-
-  });
+      if (err)
+        return fn(err);
+      if (!data)
+        return fn(null, null);
+      fn(null, val);
+    });
+  }
 };
 
 /**
