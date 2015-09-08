@@ -1,7 +1,7 @@
 
 {
   "name": "cache-manager-mongodb",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Mongodb store for the node-cache-manager",
   "main": "index.js",
   "repository": {
@@ -19,8 +19,7 @@
   "dependencies": {
     "cache-manager": "^1.1.0",
     "mongodb": "^2.0.42",
-    "mongodb-uri": "^0.9.7",
-    "thunky": "^0.1.0"
+    "mongodb-uri": "^0.9.7"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
