@@ -27,8 +27,9 @@ exports = module.exports = {
 
 function MongoStore(args) {
 
-  if (!(this instanceof MongoStore))
+  if (!(this instanceof MongoStore)) {
     return new MongoStore(args);
+  }
 
   var store = this;
   var conn = (args.uri) ? args.uri : args;
@@ -75,9 +76,11 @@ function MongoStore(args) {
         background : true,
         w : 1,
         expireAfterSeconds : store.MongoOptions.ttl || 600
-      }, function (err, indexName) {
-        if (err)
-            console.log("Error During Indexes creation");
+      }, function (err /*, indexName*/
+        ) {
+        if (err) {
+          console.log("Error During Indexes creation");
+        }
       });
     });
   }
@@ -105,17 +108,20 @@ MongoStore.prototype.get = function get(key, options, fn) {
   store.collection.findOne({
     key : key
   }, function findOne(err, data) {
-    if (err)
+    if (err) {
       return fn(err);
-    if (!data)
+    }
+    if (!data) {
       return fn(null, null);
+    }
     if (data.expire < Date.now()) {
       store.del(key);
       return fn(null, null);
     }
     try {
-      if (data.compressed)
+      if (data.compressed) {
         return decompress(data.value, fn);
+      }
       fn(null, data.value);
     } catch (err) {
       fn(err);
@@ -167,18 +173,21 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
     update(data);
   } else {
     compress(data, function compressData(err, data) {
-      if (err)
+      if (err) {
         return fn(err);
+      }
       update(data);
     });
   }
 
   function update(data) {
     store.collection.update(query, data, options, function _update(err, data) {
-      if (err)
+      if (err) {
         return fn(err);
-      if (!data)
+      }
+      if (!data) {
         return fn(null, null);
+      }
       fn(null, val);
     });
   }
@@ -247,8 +256,9 @@ MongoStore.prototype.isCacheableValue = function (value) {
 
 function compress(data, fn) {
   // Data is not of a "compressable" type (currently only Buffer)
-  if (!Buffer.isBuffer(data.value))
+  if (!Buffer.isBuffer(data.value)) {
     return fn(null, data);
+  }
 
   zlib.gzip(data.value, function (err, val) {
     // If compression was successful, then use the compressed data.
