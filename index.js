@@ -6,7 +6,6 @@
 
 var Client = require('mongodb').MongoClient,
 uri = require('mongodb-uri'),
-thunky = require('thunky'),
 zlib = require('zlib'), noop = function () {};
 
 /**
@@ -75,7 +74,7 @@ function MongoStore(args) {
         unique : true,
         background : true,
         w : 1,
-        expireAfterSeconds : store.MongoOptions.ttl
+        expireAfterSeconds : store.MongoOptions.ttl || 600
       }, function (err, indexName) {
         if (err)
             console.log("Error During Indexes creation");
@@ -176,7 +175,6 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
 
   function update(data) {
     store.collection.update(query, data, options, function _update(err, data) {
-
       if (err)
         return fn(err);
       if (!data)
@@ -200,7 +198,7 @@ MongoStore.prototype.del = function del(key, options, fn) {
   }
   var store = this;
   fn = fn || noop;
-  store.collection(store.coll).remove({
+  store.collection.remove({
     key : key
   }, {
     safe : true
@@ -248,7 +246,6 @@ MongoStore.prototype.isCacheableValue = function (value) {
  */
 
 function compress(data, fn) {
-
   // Data is not of a "compressable" type (currently only Buffer)
   if (!Buffer.isBuffer(data.value))
     return fn(null, data);
