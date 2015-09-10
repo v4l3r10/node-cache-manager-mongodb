@@ -67,23 +67,21 @@ function MongoStore(args) {
       store.client = db;
       db.createCollection(store.coll, function (err, collection) {
         store.collection = collection;
-      });
-      // Create an index on the a field
-      db.ensureIndex('ensureIndexExample1', {
-        expiresAt : 1
-      }, {
-        unique : true,
-        background : true,
-        w : 1,
-        expireAfterSeconds : store.MongoOptions.ttl || 600
-      }, function (err /*, indexName*/
-        ) {
-        if (err) {
-          console.log("Error During Indexes creation");
-        }
+        // Create an index on the a field
+        collection.createIndex('expiresAt', {
+          expiresAt : 1
+        }, {
+          unique : true,
+          background : true,
+          expireAfterSeconds : store.MongoOptions.ttl
+        }, function (err, indexName) {
+          if (err)
+            console.log("Error During Indexes creation");
+        });
       });
     });
-  }
+  });
+}
 
 }
 
