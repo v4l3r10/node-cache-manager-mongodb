@@ -75,12 +75,51 @@ function MongoStore(args) {
           background : true,
           expireAfterSeconds : store.MongoOptions.ttl
         }, function (err, indexName) {
-          if (err)
+          if (err) {
             console.log("Error During Indexes creation");
+          }
         });
       });
     });
   });
+
+  /**
+   * Compress data value.
+   *
+   * @param {Object} data
+   * @param {Function} fn
+   * @api public
+   */
+  store.compress = function compress(data, fn) {
+    // Data is not of a "compressable" type (currently only Buffer)
+    if (!Buffer.isBuffer(data.value)) {
+      return fn(null, data);
+    }
+
+    zlib.gzip(data.value, function (err, val) {
+      // If compression was successful, then use the compressed data.
+      // Otherwise, save the original data.
+      if (!err) {
+        data.value = val;
+        data.compressed = true;
+      }
+
+      fn(err, data);
+    });
+  };
+
+  /**
+   * Decompress data value.
+   *
+   * @param {Object} value
+   * @param {Function} fn
+   * @api public
+   */
+  store.decompress = function decompress(value, fn) {
+    var v = (value.buffer && Buffer.isBuffer(value.buffer)) ? value.buffer : value;
+    zlib.gunzip(v, fn);
+  };
+
 }
 
 }
@@ -118,7 +157,7 @@ MongoStore.prototype.get = function get(key, options, fn) {
     }
     try {
       if (data.compressed) {
-        return decompress(data.value, fn);
+        return store.decompress(data.value, fn);
       }
       fn(null, data.value);
     } catch (err) {
@@ -170,7 +209,7 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
   if (!store.compression) {
     update(data);
   } else {
-    compress(data, function compressData(err, data) {
+    store.compress(data, function compressData(err, data) {
       if (err) {
         return fn(err);
       }
@@ -189,6 +228,7 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
       fn(null, val);
     });
   }
+
 };
 
 /**
@@ -238,47 +278,4 @@ MongoStore.prototype.reset = function reset(key, fn) {
 
 MongoStore.prototype.isCacheableValue = function (value) {
   return value !== null && value !== undefined;
-};
-
-/**
- * Non-exported Helpers
- */
-
-/**
- * Compress data value.
- *
- * @param {Object} data
- * @param {Function} fn
- * @api public
- */
-
-function compress(data, fn) {
-  // Data is not of a "compressable" type (currently only Buffer)
-  if (!Buffer.isBuffer(data.value)) {
-    return fn(null, data);
-  }
-
-  zlib.gzip(data.value, function (err, val) {
-    // If compression was successful, then use the compressed data.
-    // Otherwise, save the original data.
-    if (!err) {
-      data.value = val;
-      data.compressed = true;
-    }
-
-    fn(err, data);
-  });
-};
-
-/**
- * Decompress data value.
- *
- * @param {Object} value
- * @param {Function} fn
- * @api public
- */
-
-function decompress(value, fn) {
-  var v = (value.buffer && Buffer.isBuffer(value.buffer)) ? value.buffer : value;
-  zlib.gunzip(v, fn);
 };
