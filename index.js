@@ -39,7 +39,7 @@ function MongoStore(args) {
 
   if ('object' === typeof conn) {
     if ('function' !== typeof conn.collection) {
-      MongoOptions = conn.options;
+      var MongoOptions = conn.options;
       if (Object.keys(MongoOptions).length === 0) {
         conn = null;
       } else if (MongoOptions.client) {
@@ -81,7 +81,7 @@ function MongoStore(args) {
         });
       });
     });
-  });
+  }
 
   /**
    * Compress data value.
