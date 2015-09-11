@@ -119,9 +119,6 @@ function MongoStore(args) {
     var v = (value.buffer && Buffer.isBuffer(value.buffer)) ? value.buffer : value;
     zlib.gunzip(v, fn);
   };
-
-}
-
 }
 
 /**
