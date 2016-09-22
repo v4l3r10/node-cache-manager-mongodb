@@ -77,6 +77,8 @@ function MongoStore(args) {
         }, function (err, indexName) {
           if (err) {
             console.log("Error During Indexes creation");
+          } else if ('function' === typeof args.createCollectionCallback){
+            args.createCollectionCallback(store);
           }
         });
       });
