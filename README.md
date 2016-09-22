@@ -79,6 +79,42 @@ mongoCache.wrap(key, function (cb) {
         console.log(user);
     });
 });
+
+// using promises with createCollectionCallback that handles race conditions.
+const mongoCachePromise = () => {
+  return new Promise((resolve) => {
+    const mongoCache = cacheManager.caching({
+      store: mongoStore,
+      uri: 'mongodb://localhost:27017/nodeCacheDb',
+      options: {
+        host: '127.0.0.1',
+        port: '27017',
+
+        // username: 'username',
+        // password: 'pass',
+        database: 'nodeCacheDb',
+        collection: 'cacheManager',
+        compression: false,
+        server: {
+          poolSize: 5,
+          auto_reconnect: true,
+        },
+      },
+      createCollectionCallback: () => {
+        console.log('done creating collection');
+        return resolve(mongoCache);
+      },
+    });
+  });
+};
+
+
+mongoCachePromise.then((mongoCache) => {
+  return mongoCache.wrap(key, () => {
+    return getUser(userId);
+  });
+});
+
 ```
 
 ### Multi-store
