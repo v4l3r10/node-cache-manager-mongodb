@@ -109,7 +109,7 @@ const mongoCachePromise = () => {
 };
 
 
-this.mongoCachePromise.then((mongoCache) => {
+mongoCachePromise.then((mongoCache) => {
   return mongoCache.wrap(key, () => {
     return getUser(userId);
   });
