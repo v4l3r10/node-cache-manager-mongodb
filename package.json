@@ -1,6 +1,6 @@
 {
   "name": "cache-manager-mongodb",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Mongodb store for the node-cache-manager",
   "main": "index.js",
   "repository": {
