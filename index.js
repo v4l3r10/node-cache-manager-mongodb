@@ -9,16 +9,6 @@ uri = require('mongodb-uri'),
 zlib = require('zlib'), noop = function () {};
 
 /**
- * Export `MongoStore`.
- */
-
-exports = module.exports = {
-  create : function (args) {
-    return MongoStore(args);
-  }
-};
-
-/**
  * MongoStore constructor.
  *
  * @param {Object} options
@@ -43,7 +33,7 @@ function MongoStore(args) {
       if (Object.keys(MongoOptions).length === 0) {
         conn = null;
       } else if (MongoOptions.client) {
-        store.client = MongoOptions.client
+        store.client = MongoOptions.client;
       } else {
         store.MongoOptions.database = store.MongoOptions.database || store.MongoOptions.db;
         store.MongoOptions.hosts = store.MongoOptions.hosts || [{
@@ -68,15 +58,9 @@ function MongoStore(args) {
       db.createCollection(store.coll, function (err, collection) {
         store.collection = collection;
         // Create an index on the a field
-        collection.createIndex('expiresAt', {
-          expiresAt : 1
-        }, {
-          unique : true,
-          background : true,
-          expireAfterSeconds : store.MongoOptions.ttl
-        }, function (err, indexName) {
+        collection.createIndexes([{key:{exp:1}, background: true, expireAfterSeconds:0}, {key:{key:1}, unique: true}], function (err) {
           if (err) {
-            console.log("Error During Indexes creation");
+            console.log("Error During Indexes creation", err);
           } else if ('function' === typeof args.createCollectionCallback){
             args.createCollectionCallback(store);
           }
@@ -150,7 +134,7 @@ MongoStore.prototype.get = function get(key, options, fn) {
     if (!data) {
       return fn(null, null);
     }
-    if (data.expire < Date.now()) {
+    if (data.exp < new Date()) {
       store.del(key);
       return fn(null, null);
     }
@@ -184,26 +168,24 @@ MongoStore.prototype.set = function set(key, val, options, fn) {
   fn = fn || noop;
 
   var store = this;
-  var ttl = (options && (options.ttl || options.ttl === 0)) ? options.ttl : store.MongoOptions.ttl;
+  var ttl = options && options.ttl || store.MongoOptions.ttl || 60;
 
   var data,
   query = {
     key : key
-  },
+  };
   options = {
     upsert : true,
     safe : true
   };
 
-  try {
-    data = {
-      key : key,
-      value : val,
-      expire : Date.now() + ((ttl || 60) * 1000)
-    };
-  } catch (err) {
-    return fn(err);
-  }
+
+  data = {
+    key : key,
+    value : val,
+    exp : new Date(Date.now() + (ttl * 1000))
+  };
+
 
   if (!store.compression) {
     update(data);
@@ -277,4 +259,14 @@ MongoStore.prototype.reset = function reset(key, fn) {
 
 MongoStore.prototype.isCacheableValue = function (value) {
   return value !== null && value !== undefined;
+};
+
+/**
+ * Export `MongoStore`.
+ */
+
+exports = module.exports = {
+  create : function (args) {
+    return new MongoStore(args);
+  }
 };
