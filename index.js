@@ -68,7 +68,7 @@ function MongoStore(args) {
       db.createCollection(store.coll, function (err, collection) {
         store.collection = collection;
         // Create an index on the a field
-        collection.createIndex('expiresAt', {
+        collection.createIndex({
           expiresAt : 1
         }, {
           unique : true,
@@ -127,6 +127,7 @@ function MongoStore(args) {
  * Get an entry.
  *
  * @param {String} key
+ * @param {} options
  * @param {Function} fn
  * @api public
  */

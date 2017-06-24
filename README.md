@@ -35,10 +35,8 @@ var mongoCache = cacheManager.caching({
       database : "nodeCacheDb",
       collection : "cacheManager",
       compression : false,
-      server : {
-        poolSize : 5,
-        auto_reconnect: true
-      }
+      poolSize : 5,
+      auto_reconnect: true
     }
   });
 
