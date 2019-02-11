@@ -3,7 +3,9 @@ Node Cache Manager store for MongoDB
 
 [![Codacy Badge](https://api.codacy.com/project/badge/c865d138d52541f8845090ed3992357a)](https://www.codacy.com/app/valerio-cavagni/node-cache-manager-mongodb) [![Dependency Status](https://david-dm.org/v4l3r10/node-cache-manager-mongodb.svg)](https://david-dm.org/v4l3r10/node-cache-manager-mongodb)
 
-The MongoDb store for the [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager) module.
+The MongoDb store for the [node-cache-manager](https://github.com/BryanDonovan/node-cache-manager) module. 
+
+Special thx to @onlyurei and @dcolens
 
 Installation
 ------------
@@ -11,6 +13,12 @@ Installation
 ```sh
 npm install cache-manager-mongodb --save
 ```
+
+## News
+
+​	Switch to full Promise support.
+
+​	New Mocha test (thx to @[dcolens](https://github.com/v4l3r10/node-cache-manager-mongodb/issues?q=is%3Apr+is%3Aopen+author%3Adcolens) )
 
 Usage examples
 --------------
@@ -28,36 +36,30 @@ var mongoCache = cacheManager.caching({
     store : mongoStore,
     uri : "mongodb://user:pass@localhost:27017/nodeCacheDb",
     options : {
-      host : '127.0.0.1',
-      port : '27017',
-      username : "username",
-      password : "pass",
-      database : "nodeCacheDb",
       collection : "cacheManager",
       compression : false,
       poolSize : 5,
-      auto_reconnect: true
+      autoReconnect: true
     }
   });
 
 var ttl = 60;
 
-mongoCache.set('foo', 'bar', ttl, function(err) {
-    if (err) {
-      throw err;
-    }
-
-    mongoCache.get('foo', function(err, result) {
+mongoCache.set('foo', 'bar', ttl)
+	.then(()=>{
+     return mongoCache.get('foo')
+	}).then((result) => {
         console.log(result);
         // >> 'bar'
-        mongoCache.del('foo', function(err) {});
+        return mongoCache.del('foo');
     });
 });
 
-function getUser(id, cb) {
+function getUser(id) {
+    return new Promise((resolve,reject)=>{
     setTimeout(function () {
         console.log("Returning user from slow database.");
-        cb(null, {id: id, name: 'Bob'});
+        return resolve({id: id, name: 'Bob'});
     }, 100);
 }
 
@@ -65,52 +67,18 @@ var userId = 123;
 var key = 'user_' + userId;
 
 // Note: ttl is optional in wrap()
-mongoCache.wrap(key, function (cb) {
-    getUser(userId, cb);
-}, ttl, function (err, user) {
-    console.log(user);
+mongoCache.wrap(key, function () {
+    return getUserPromise(userId);
+}, ttl)
+    .then((user) => {
+   	 console.log(user);
 
     // Second time fetches user from mongoCache
-    mongoCache.wrap(key, function (cb) {
-        getUser(userId, cb);
-    }, function (err, user) {
+    mongoCache.wrap(key, function () {
+       return getUserPromise(userId);
+    }.then(( user) => {
         console.log(user);
     });
-});
-
-// using promises with createCollectionCallback that handles race conditions.
-const mongoCachePromise = () => {
-  return new Promise((resolve) => {
-    const mongoCache = cacheManager.caching({
-      store: mongoStore,
-      uri: 'mongodb://localhost:27017/nodeCacheDb',
-      options: {
-        host: '127.0.0.1',
-        port: '27017',
-
-        // username: 'username',
-        // password: 'pass',
-        database: 'nodeCacheDb',
-        collection: 'cacheManager',
-        compression: false,
-        server: {
-          poolSize: 5,
-          auto_reconnect: true,
-        },
-      },
-      createCollectionCallback: () => {
-        console.log('done creating collection');
-        return resolve(mongoCache);
-      },
-    });
-  });
-};
-
-
-mongoCachePromise.then((mongoCache) => {
-  return mongoCache.wrap(key, () => {
-    return getUser(userId);
-  });
 });
 
 ```
@@ -132,41 +100,42 @@ key2 = 'user_' + userId;
 ttl = 5;
 
 // Sets in all caches.
-multiCache.set('foo2', 'bar2', ttl, function(err) {
-    if (err) { throw err; }
-
-    // Fetches from highest priority cache that has the key.
-    multiCache.get('foo2', function(err, result) {
+multiCache.set('foo2', 'bar2', ttl)
+    .then(()=>{
+    	// Fetches from highest priority cache that has the key.
+    	return multiCache.get('foo2')
+	}).then((result) => {
         console.log(result);
         // >> 'bar2'
-
         // Delete from all caches
-        multiCache.del('foo2');
+        return multiCache.del('foo2');
     });
 });
 
 // Note: ttl is optional in wrap()
-multiCache.wrap(key2, function (cb) {
-    getUser(userId2, cb);
-}, ttl, function (err, user) {
+multiCache.wrap(key2, function () {
+    return getUserPromise(userId2);
+}, ttl)
+.then((user) => {
+   		console.log(user);
+   		 // Second time fetches user from memoryCache, since it's highest priority.
+    	// If the data expires in the memory cache, the next fetch would pull it from
+    	// the 'someOtherCache', and set the data in memory again.
+    	return multiCache.wrap(key2, function () {
+     	   return getUserPromise(userId2);
+    	});
+}).then((user)=>{
     console.log(user);
-
-    // Second time fetches user from memoryCache, since it's highest priority.
-    // If the data expires in the memory cache, the next fetch would pull it from
-    // the 'someOtherCache', and set the data in memory again.
-    multiCache.wrap(key2, function (cb) {
-        getUser(userId2, cb);
-    }, function (err, user) {
-        console.log(user);
-    });
 });
 
-function getUser(id, cb) {
-    setTimeout(function () {
-        console.log("Returning user from slow database.");
-        cb(null, {id: id, name: 'Bob'});
-    }, 100);
-}
+function getUserPromise(id) {
+    return new Promise((resolve,reject)=>{
+        setTimeout(function () {
+       	 console.log("Returning user from slow database.");
+       	 return resolve({id: id, name: 'Bob'});
+ 	 	}, 100);
+    })
+});
 ```
 
 
