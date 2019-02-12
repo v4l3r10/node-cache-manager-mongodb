@@ -16,7 +16,7 @@ const validOptionNames = ['poolSize', 'ssl', 'sslValidate', 'sslCA', 'sslCert',
   'serializeFunctions', 'ignoreUndefined', 'raw', 'bufferMaxEntries',
   'readPreference', 'pkFactory', 'promiseLibrary', 'readConcern', 'maxStalenessSeconds',
   'loggerLevel', 'logger', 'promoteValues', 'promoteBuffers', 'promoteLongs',
-  'domainsEnabled', 'keepAliveInitialDelay', 'checkServerIdentity', 'validateOptions', 'appname', 'auth'
+  'domainsEnabled', 'keepAliveInitialDelay', 'checkServerIdentity', 'validateOptions', 'appname', 'auth', 'useNewUrlParser'
 ];
 
 
@@ -127,16 +127,18 @@ class MongoStore {
 
   get(key, options, cb) {
     var store = this;
+
+    if (typeof options === 'function') {
+      cb = options;
+      options = {};
+    }
+
     if (cb === undefined) {
       return new Promise(function (resolve, reject) {
         store.get(key, options, function (err, result) {
           err ? reject(err) : resolve(result)
         })
       })
-    }
-    if (typeof options === 'function') {
-      cb = options;
-      options = {};
     }
 
     store.getCollection()
@@ -166,7 +168,12 @@ class MongoStore {
 
   set(key, val, options, cb) {
     const store = this;
-    var options = options;
+
+    if (typeof options === 'function') {
+      cb = options;
+      options = {};
+    }
+
     if (cb === undefined) {
       return new Promise(function (resolve, reject) {
         store.set(key, val, options, function (err, result) {
@@ -175,10 +182,6 @@ class MongoStore {
       })
     }
 
-    if (typeof options === 'function') {
-      cb = options;
-      options = {};
-    }
     var data = {
       key: key,
       value: val
@@ -204,10 +207,14 @@ class MongoStore {
           return store.compress(data.value)
             .then((value) => {
               data.value = value;
-              return collection.findOneAndUpdate(query, data, opt);
+              return collection.findOneAndUpdate(query, {
+                '$set': data
+              }, opt);
             });
         }
-        return collection.findOneAndUpdate(query, data, opt);
+        return collection.findOneAndUpdate(query, {
+          '$set': data
+        }, opt);
       }).then((data) => {
         return cb(null, data);
       }).catch(err => cb(err));
@@ -224,22 +231,23 @@ class MongoStore {
 
   del(key, options, cb) {
     var store = this;
-    if (cb === undefined) {
-      return new Promise(function (resolve, reject) {
-        store.del(key, val, options, function (err, result) {
-          err ? reject(err) : resolve(result)
-        })
-      })
-    }
 
     if (typeof options === 'function') {
       cb = options;
       options = {};
     }
 
+    if (cb === undefined) {
+      return new Promise(function (resolve, reject) {
+        store.del(key, options, function (err, result) {
+          err ? reject(err) : resolve(result)
+        })
+      })
+    }
+
     store.getCollection()
       .then((collection) => {
-        return collection.remove({
+        return collection.deleteOne({
           key: key
         }, {
           safe: true
@@ -259,16 +267,22 @@ class MongoStore {
 
   reset(key, cb) {
     var store = this;
+
+    if (typeof key === 'function') {
+      cb = key;
+      key = {};
+    }
+
     if (cb === undefined) {
       return new Promise(function (resolve, reject) {
-        store.reset(key, val, options, function (err, result) {
+        store.reset(key, function (err, result) {
           err ? reject(err) : resolve(result)
         })
       })
     }
     store.getCollection()
       .then((collection) => {
-        return collection.remove({}, {
+        return collection.deleteMany({}, {
           safe: true
         });
       }).then(() => {

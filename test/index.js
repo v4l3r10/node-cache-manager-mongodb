@@ -13,7 +13,9 @@ describe('node-cache-manager-mongodb', function () {
   var mongoC;
 
   before('connect to mongo', function (done) {
-    MongoClient.connect(mongoUri, function (err, client) {
+    MongoClient.connect(mongoUri, {
+      useNewUrlParser: true
+    }, function (err, client) {
       mongoC = client;
       db = mongoC.db();
       c = db.collection(collection);
@@ -78,20 +80,61 @@ describe('node-cache-manager-mongodb', function () {
       });
     });
 
+    it('check get', function (done) {
+      this.timeout(5000);
+      s.set('test-cookie-3', 'test-user', {
+        ttl: 100000
+      }, function () {
+        s.get('test-cookie-3', function (e, v) {
+          assert.equal('test-user', v);
+          done(e);
+        });
+      });
+    });
+
+    it('check del', function (done) {
+      this.timeout(5000);
+      s.set('test-cookie-4', 'test-user', {
+        ttl: 100000
+      }, function () {
+        s.del('test-cookie-4', function (e, v) {
+          s.get('test-cookie-4', function (e, v) {
+            assert.equal(null, v);
+            done(e);
+          })
+        });
+      });
+    });
+
     it('check mongo expiry (this takes long)', function (done) {
       this.timeout(10000);
-      s.set('test-cookie-3', 'test-user', {
+      s.set('test-cookie-5', 'test-user', {
         ttl: 1
       }, function () {
         setTimeout(function () {
           var c = db.collection(collection);
           c.findOne({
-            key: 'test-cookie-3'
+            key: 'test-cookie-5'
           }, function (e, r) {
             assert.equal(null, r);
             done(e);
           });
         }, 5000);
+      });
+    });
+
+    it('check reset cache', function (done) {
+      this.timeout(10000);
+      s.mset('test-cookie-3', 'test-user', 'test-cookie-2', 'test-user', 'test-cookie-1', 'test-user', {
+        ttl: 60000
+      }, function () {
+        s.reset(function () {
+          var c = db.collection(collection);
+          c.find({}, function (e, r) {
+            assert.equal(0, r.length);
+            done(e);
+          });
+        });
       });
     });
 
