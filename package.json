@@ -1,6 +1,6 @@
 {
   "name": "cache-manager-mongodb",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Mongodb store for the node-cache-manager",
   "main": "index.js",
   "scripts": {
@@ -21,11 +21,11 @@
   "dependencies": {
     "bluebird": "^3.5.3",
     "cache-manager": "^2.9.0",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.15",
     "mongodb": "^3.1.13"
   },
   "devDependencies": {
-    "grunt": "^1.0.3",
+    "grunt": "^1.0.4",
     "grunt-contrib-jshint": "^2.0.0",
     "jshint-stylish": "^2.2.1",
     "load-grunt-tasks": "^4.0.0",
