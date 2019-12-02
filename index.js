@@ -16,7 +16,8 @@ const validOptionNames = ['poolSize', 'ssl', 'sslValidate', 'sslCA', 'sslCert',
   'serializeFunctions', 'ignoreUndefined', 'raw', 'bufferMaxEntries',
   'readPreference', 'pkFactory', 'promiseLibrary', 'readConcern', 'maxStalenessSeconds',
   'loggerLevel', 'logger', 'promoteValues', 'promoteBuffers', 'promoteLongs',
-  'domainsEnabled', 'keepAliveInitialDelay', 'checkServerIdentity', 'validateOptions', 'appname', 'auth', 'useNewUrlParser'
+  'domainsEnabled', 'keepAliveInitialDelay', 'checkServerIdentity', 'validateOptions', 'appname', 'auth', 'useNewUrlParser',
+  'useUnifiedTopology'
 ];
 
 
