@@ -64,7 +64,12 @@ class MongoStore {
       return client.db();
     }).then((db) => {
       store.client = db;
-      return store.client.createCollection(store.coll);
+      return store.client.collection(store.coll);
+    }).then((collection) => {
+      if (!collection) {
+        return store.client.createCollection(store.coll);
+      }
+      return collection;
     }).then((collection) => {
       store.collection = collection;
       //create Expire index that hook TTL when date in expire is lower than Now()
