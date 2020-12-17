@@ -38,8 +38,9 @@ class MongoStore {
     store.MongoOptions.ttl = (store.MongoOptions.ttl) ? store.MongoOptions.ttl : 60 * 1000;
     store.MongoOptions.promiseLibrary = Promise;
     store.MongoOptions.useNewUrlParser = true;
+    store.MongoOptions.useUnifiedTopology = true;
     store.name = 'mongodb';
-
+    store.expireKey = 'expire';
     store.coll = store.MongoOptions.collection || 'cacheman';
     store.compression = store.MongoOptions.compression || false;
     return this;
@@ -64,23 +65,55 @@ class MongoStore {
       return client.db();
     }).then((db) => {
       store.client = db;
-      return store.client.collection(store.coll);
-    }).then((collection) => {
-      if (!collection) {
-        return store.client.createCollection(store.coll);
-      }
-      return collection;
-    }).then((collection) => {
-      store.collection = collection;
-      //create Expire index that hook TTL when date in expire is lower than Now()
-      return store.client.createIndex(store.coll, 'expire', {
-        expireAfterSeconds: 0
-        //,background: true
-      });
+      return store.initColl();
     }).then(() => {
       return store.collection;
     }).catch((err) => {
+      console.log(err);
       throw err;
+    });
+  }
+
+  /**
+   * Init Collection on db
+   */
+  initColl() {
+    var self = this;
+    return self.checkColl()
+      .then((collection) => {
+        if (collection) {
+          self.collection = collection;
+          return collection;
+        }
+        //if not exist create it with index
+        return self.client.createCollection(self.coll).then((coll) => {
+          self.collection = coll;
+          //create Expire index that hook TTL when date in expire is lower than expire field
+          return self.collection.createIndex('expire', {
+            expireAfterSeconds: 0
+          });
+        }).then(() => {
+          return self.collection.createIndex('key', {
+            unique: true
+          });
+        })
+      })
+  }
+
+  /**
+   * Promisify collection check method
+   */
+  checkColl() {
+    var self = this;
+    return new Promise((resolve, reject) => {
+      self.client.collection(self.coll, { strict: true }, (err, coll) => {
+        //if err is collectio not exist resolve with null value
+        if (err && err.message.indexOf('not exist') > -1)
+          return resolve();
+        else if (err)
+          return reject(err);
+        return resolve(coll);
+      });
     });
   }
 
@@ -205,7 +238,7 @@ class MongoStore {
     };
     const opt = {
       upsert: true,
-      safe: true
+      w: 1
     };
     store.getCollection()
       .then((collection) => {
@@ -255,11 +288,11 @@ class MongoStore {
       .then((collection) => {
         return collection.deleteOne({
           key: key
-        }, {
-          safe: true
         });
-      }).then(() => {
-        return cb(null, true);
+      }).then((r) => {
+        if (r.deleteCount)
+          return cb(null, true);
+        return cb(null, false);
       }).catch(err => cb(err));
   }
 
@@ -289,7 +322,7 @@ class MongoStore {
     store.getCollection()
       .then((collection) => {
         return collection.deleteMany({}, {
-          safe: true
+          w: 1
         });
       }).then(() => {
         return cb(null, true);

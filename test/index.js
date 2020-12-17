@@ -1,8 +1,8 @@
 'use strict';
-
+const Promise = require("bluebird");
 var MongoClient = require('mongodb').MongoClient,
   store = require('../index.js'),
-  mongoUri = 'mongodb://127.0.0.1:27017/test',
+  mongoUri = 'mongodb://userTest:test@192.168.1.5:27017/test',
   collection = 'test_node_cache_mongodb_1',
   collection2 = 'test_node_cache_mongodb_2',
   assert = require('assert');
@@ -14,10 +14,11 @@ describe('node-cache-manager-mongodb', function () {
 
   before('connect to mongo', function (done) {
     MongoClient.connect(mongoUri, {
-      useNewUrlParser: true
+      useNewUrlParser: true,
+      useUnifiedTopology: true
     }, function (err, client) {
       mongoC = client;
-      db = mongoC.db();
+      db = mongoC.db('test');
       c = db.collection(collection);
       c2 = db.collection(collection2);
       done(err);
@@ -31,7 +32,7 @@ describe('node-cache-manager-mongodb', function () {
         uri: mongoUri,
         options: {
           collection: collection,
-          ttl: 5
+          ttl: 0.1
         }
       });
       setTimeout(function () {
@@ -39,133 +40,129 @@ describe('node-cache-manager-mongodb', function () {
       }, 500);
     });
 
-    it('check mongo expiry', function (done) {
-      this.timeout(5000);
-      s.set('test-cookie-0', 'test-user', {
+    it('check mongo expiry (this takes long)', function () {
+      this.timeout(60000);
+      return s.set('test-cookie-0', 'test-user', {
         ttl: 0.1
-      }, function () {
-        setTimeout(function () {
-          c.findOne({
-            key: 'test-cookie-0'
-          }, function (e, r) {
-            assert.equal(r, null);
-            done(e);
-          });
-        }, 2000);
-      });
+      }).delay(30000).then(() => {
+        return c.findOne({
+          key: 'test-cookie-0'
+        });
+      }).then((r) => {
+        assert.ok(!r);
+      })
     });
 
-    it('value with 1s expiry', function (done) {
-      s.set('test-cookie-1', 'test-user', {
+
+    it('value with 1s expiry', function () {
+      this.timeout(30000);
+      return s.set('test-cookie-1', 'test-user', {
         ttl: 1
-      }, function () {
-        s.get('test-cookie-1', function (e, v) {
-          assert.equal(null, v);
-          done(e);
+      }).delay(5000)
+        .then(() => {
+          return s.get('test-cookie-1')
+        }).then((v) => {
+          assert.ok(!v);
         });
-      });
     });
 
-    it('check expiry', function (done) {
-      this.timeout(5000);
-      s.set('test-cookie-2', 'test-user', {
+    it('check expiry', function () {
+      this.timeout(30000);
+      return s.set('test-cookie-2', 'test-user', {
         ttl: 1
-      }, function () {
-        setTimeout(function () {
-          s.get('test-cookie-2', function (e, v) {
-            assert.equal(null, v);
-            done(e);
-          });
-        }, 2000);
-      });
-    });
-
-    it('check get', function (done) {
-      this.timeout(5000);
-      s.set('test-cookie-3', 'test-user', {
-        ttl: 100000
-      }, function () {
-        s.get('test-cookie-3', function (e, v) {
-          assert.equal('test-user', v);
-          done(e);
+      }).delay(10000)
+        .then(() => {
+          return s.get('test-cookie-2')
+        }).then((v) => {
+          assert.ok(!v);
         });
-      });
     });
 
-    it('check del', function (done) {
+    it('check get', function () {
       this.timeout(5000);
-      s.set('test-cookie-4', 'test-user', {
-        ttl: 100000
-      }, function () {
-        s.del('test-cookie-4', function (e, v) {
-          s.get('test-cookie-4', function (e, v) {
-            assert.equal(null, v);
-            done(e);
-          })
-        });
+      return s.set('test-cookie-3', 'test-user', {
+        ttl: 10
+      }).then(() => {
+        return s.get('test-cookie-3');
+      }).then((v) => {
+        assert.strictEqual('test-user', v);
       });
     });
 
-    it('check mongo expiry (this takes long)', function (done) {
-      this.timeout(10000);
+    it('check del', function () {
+      this.timeout(5000);
+      return s.set('test-cookie-4', 'test-user', {
+        ttl: 10000
+      }).then(() => {
+        return s.del('test-cookie-4');
+      }).then(() => {
+        return s.get('test-cookie-4');
+      }).then((v) => {
+        assert.ok(!v);
+      })
+    });
+
+    /*it('check mongo expiry (this takes long)', function (done) {
+      this.timeout(5000);
       s.set('test-cookie-5', 'test-user', {
         ttl: 1
-      }, function () {
-        setTimeout(function () {
-          var c = db.collection(collection);
+      }, function (err) {
+        setTimeout(function (err) {
           c.findOne({
             key: 'test-cookie-5'
           }, function (e, r) {
-            assert.equal(null, r);
+            console.log(e);
+            console.log(r);
+            assert.ok(!!!r);
             done(e);
           });
-        }, 5000);
+        }, 3000);
       });
-    });
+    });*/
 
-    it('check reset cache', function (done) {
-      this.timeout(10000);
-      s.mset('test-cookie-3', 'test-user', 'test-cookie-2', 'test-user', 'test-cookie-1', 'test-user', {
-        ttl: 60000
-      }, function () {
-        s.reset(function () {
-          var c = db.collection(collection);
-          c.find({}, function (e, r) {
-            assert.equal(0, r.length);
-            done(e);
-          });
-        });
-      });
+    it('check reset cache', function () {
+      this.timeout(60000);
+      return Promise.all([
+        s.set('test-cookie-3', 'test-cookie-3', { ttl: 60000 }),
+        s.set('test-cookie-2', 'test-cookie-2', { ttl: 60000 }),
+        s.set('test-user', 'test-user', { ttl: 60000 })])
+        .then(() => {
+          return s.reset();
+        }).then(() => {
+          return c.find({});
+        }).then((res) => {
+          return res.count();
+        }).then((len) => {
+          assert.ok(!!!len);
+        })
     });
 
   });
 
   describe('create a second collection', function () {
     var s;
-    before('connect', function (done) {
+    before('connect', function () {
+      this.timeout(30000);
       s = store.create({
         uri: mongoUri,
         options: {
-          collection: collection2
+          collection: collection2,
+          ttl: 5
         }
       });
-      setTimeout(function () {
-        done();
-      }, 500);
+      return Promise.delay(1000);
     });
 
-    it('check expiry', function (done) {
-      this.timeout(1000);
-      s.set('test-cookie-2', 'test-user', {
+    it('check expiry', function () {
+      this.timeout(30000);
+      return s.set('test-cookie-2', 'test-user', {
         ttl: 0.1
-      }, function () {
-        setTimeout(function () {
-          s.get('test-cookie-2', function (e, v) {
-            assert.equal(null, v);
-            done(e);
-          });
-        }, 200);
-      });
+      }).delay(500)
+        .then(() => {
+          return s.get('test-cookie-2')
+        }).then((v) => {
+          assert.ok(!v);
+        })
     });
 
   });
