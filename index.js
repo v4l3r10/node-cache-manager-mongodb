@@ -12,12 +12,12 @@ const validOptionNames = ['poolSize', 'ssl', 'sslValidate', 'sslCA', 'sslCert',
   'sslKey', 'sslPass', 'sslCRL', 'autoReconnect', 'noDelay', 'keepAlive', 'connectTimeoutMS', 'family',
   'socketTimeoutMS', 'reconnectTries', 'reconnectInterval', 'ha', 'haInterval',
   'replicaSet', 'secondaryAcceptableLatencyMS', 'acceptableLatencyMS',
-  'connectWithNoPrimary', 'authSource', 'w', 'wtimeout', 'j', 'forceServerObjectId',
+  'connectWithNoPrimary', 'authSource', 'forceServerObjectId',
   'serializeFunctions', 'ignoreUndefined', 'raw', 'bufferMaxEntries',
   'readPreference', 'pkFactory', 'promiseLibrary', 'readConcern', 'maxStalenessSeconds',
   'loggerLevel', 'logger', 'promoteValues', 'promoteBuffers', 'promoteLongs',
   'domainsEnabled', 'keepAliveInitialDelay', 'checkServerIdentity', 'validateOptions', 'appname', 'auth', 'useNewUrlParser',
-  'useUnifiedTopology'
+  'useUnifiedTopology', 'writeConcern'
 ];
 
 
@@ -39,6 +39,7 @@ class MongoStore {
     store.MongoOptions.promiseLibrary = Promise;
     store.MongoOptions.useNewUrlParser = true;
     store.MongoOptions.useUnifiedTopology = true;
+    store.MongoOptions.writeConcern = {w: 0};
     store.name = 'mongodb';
     store.expireKey = 'expire';
     store.coll = store.MongoOptions.collection || 'cacheman';
@@ -238,7 +239,6 @@ class MongoStore {
     };
     const opt = {
       upsert: true,
-      w: 1
     };
     store.getCollection()
       .then((collection) => {
