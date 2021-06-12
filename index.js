@@ -43,6 +43,7 @@ class MongoStore {
     store.expireKey = 'expire';
     store.coll = store.MongoOptions.collection || 'cacheman';
     store.compression = store.MongoOptions.compression || false;
+    store.support_cosmosDB = store.options.support_cosmosDB || false;
     return this;
   }
 
@@ -83,15 +84,28 @@ class MongoStore {
       .then((collection) => {
         if (collection) {
           self.collection = collection;
+          if (self.support_cosmosDB) {
+
+            // In cosmosDB only support _ts custom index when expireAfterSeconds is given and also this index is required so that value given as ttl will work
+            self.collection.createIndex({ _ts: 1 }, {
+              expireAfterSeconds: -1
+            });
+          }
           return collection;
         }
         //if not exist create it with index
         return self.client.createCollection(self.coll).then((coll) => {
           self.collection = coll;
+          if (self.support_cosmosDB) {
+            return self.collection.createIndex({ _ts: 1 }, {
+              expireAfterSeconds: -1
+            });
+          } else {
+            return self.collection.createIndex('expire', {
+              expireAfterSeconds: 0
+            });
+          }
           //create Expire index that hook TTL when date in expire is lower than expire field
-          return self.collection.createIndex('expire', {
-            expireAfterSeconds: 0
-          });
         }).then(() => {
           return self.collection.createIndex('key', {
             unique: true
@@ -228,11 +242,14 @@ class MongoStore {
     data.expire = new Date();
 
     //if new ttl generate expire Date else use standard TTL
-    if (options && options.ttl)
+    if (options && options.ttl) {
       data.expire.setTime(data.expire.getTime() + (options.ttl * 1000));
-    else
+      store.setCosmosDbTTl(options.ttl)
+    }
+    else {
       data.expire.setTime(data.expire.getTime() + (store.MongoOptions.ttl * 1000));
-
+      store.setCosmosDbTTl(store.MongoOptions.ttl)
+    }
     const query = {
       key: key
     };
@@ -332,6 +349,15 @@ class MongoStore {
 
   isCacheableValue(value) {
     return value !== null && value !== undefined;
+  }
+
+
+  // When migrating from mongodb to cosmos db ,we can expire document by setting a integer value for ttl
+  setCosmosDbTTl(ttl) {
+    store = this;
+    if (store.support_cosmosDB) {
+      data.ttl = parseInt(ttl);
+    }
   }
 }
 
