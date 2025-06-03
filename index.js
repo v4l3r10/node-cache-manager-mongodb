@@ -35,7 +35,8 @@ class MongoStore {
     store.uri = (args.uri) ? args.uri : 'mongodb://localhost:27017/cache';
     store.options = (args.options) ? args.options : {};
     store.MongoOptions = store.options;
-    store.MongoOptions.ttl = (store.MongoOptions.ttl) ? store.MongoOptions.ttl : 60 * 1000;
+    // ttl option is expressed in seconds. Default to 60 seconds
+    store.MongoOptions.ttl = (store.MongoOptions.ttl) ? store.MongoOptions.ttl : 60;
     store.MongoOptions.promiseLibrary = Promise;
     store.MongoOptions.useNewUrlParser = true;
     store.MongoOptions.useUnifiedTopology = true;
@@ -189,8 +190,11 @@ class MongoStore {
         if (!data)
           return cb();
         if (data.expire < (new Date())) return cb();
-        if (data.compressed)
-          return cb(null, store.decompress(data.value));
+        if (store.compression || data.compressed) {
+          return store.decompress(data.value)
+            .then((val) => cb(null, val))
+            .catch(cb);
+        }
         return cb(null, data.value);
       }).catch(err => cb(err));
   }
@@ -246,6 +250,7 @@ class MongoStore {
           return store.compress(data.value)
             .then((value) => {
               data.value = value;
+              data.compressed = true;
               return collection.findOneAndUpdate(query, {
                 '$set': data
               }, opt);
@@ -289,11 +294,11 @@ class MongoStore {
         return collection.deleteOne({
           key: key
         });
-      }).then((r) => {
-        if (r.deleteCount)
-          return cb(null, true);
-        return cb(null, false);
-      }).catch(err => cb(err));
+        }).then((r) => {
+          if (r.deletedCount)
+            return cb(null, true);
+          return cb(null, false);
+        }).catch(err => cb(err));
   }
 
   /**
